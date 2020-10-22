@@ -1,0 +1,11 @@
+sensor_msgs/Image image
+string language
+float32[] robot
+bool reset
+bool plot
+---
+float32[] trajectory
+float32[] confidence
+int32 timesteps
+float32[] weights
+float32 phase
