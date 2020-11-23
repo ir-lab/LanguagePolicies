@@ -2,7 +2,6 @@
 
 from pyrep import PyRep
 from pyrep.objects.vision_sensor import VisionSensor
-# from multiprocessing import Process
 from ros1compat import kdl_urdf_parser as kdl_parser_py
 import PyKDL as kdl
 import numpy as np
@@ -15,17 +14,30 @@ import time
 import json
 from voice import Voice
 from joblib import Parallel, delayed
+import os
 
-PROCESSES           = 5
-SAMPLES_PER_PROCESS = 20
+# How many processes shold collect data in parallel? 
+# A good measure is to put the number of CPU cores you have (Note that each process needs ~1GB of RAM also)
+PROCESSES           = 4
+# How many demonstrations (picking and pouring) should each process collect? 
+SAMPLES_PER_PROCESS = 10
+# Ever n demonstrations, VRep will be restarted entirely, not just the simulation. You don't need to change this
 RESET_EACH          = 20
+# If you run more than 1 process, you should run VRep headless
 VREP_HEADLESS       = True
+# Default position of the UR5 robot. You do not need to change this
 DEFAULT_UR5_JOINTS  = [105.0, -30.0, 120.0, 90.0, 60.0, 90.0]
-ROBOT_URDF          = "Data/Simulator/urdf/ur5_robot.urdf"
+# Path to the UR5 URDF file
+ROBOT_URDF          = "../GDrive/ur5_robot.urdf"
+# General speed of the robot. Lower values will increase the robot's movement speed
 TGEN_SPEED_FACTOR   = 150
+# Height at which to grasp the cups. You do not need to change this.
 GRASP_HEIGHT        = 0.115
-DATA_PATH           = "Data/Datasets/RSS/testdata_new/"
-
+# Output directory of the collected data
+DATA_PATH           = "../GDrive/collected/"
+# Where to find the VRep scene file. This has to be an absolute path. 
+VREP_SCENE          = "../GDrive/NeurIPS2020.ttt"
+VREP_SCENE          = os.getcwd() + "/" + VREP_SCENE
 
 class SimulatorState(object):
     def __init__(self, array):
@@ -458,7 +470,7 @@ def run():
             if pyrep is not None:
                 pyrep.shutdown()
             pyrep = PyRep()
-            pyrep.launch("/home/sstepput/Development/PolicyTranslation/RSS2020.ttt", headless=VREP_HEADLESS)
+            pyrep.launch(VREP_SCENE, headless=VREP_HEADLESS)
 
         collectSingleSample(pyrep)
 

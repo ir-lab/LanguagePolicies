@@ -45,10 +45,10 @@ def limitGPUMemory():
             print(e)
 
 class DataConverter():
-    def __init__(self, dict_path):
+    def __init__(self, dict_path, frcnn_path):
         self.dictionary  = self._loadDictionary(dict_path)
         self.regex       = re.compile('[^a-z ]')
-        self.frcnn       = tf.saved_model.load(str("object_detection/exported_sim_rss/saved_model"))
+        self.frcnn       = tf.saved_model.load(str(frcnn_path))
         self.frcnn       = self.frcnn.signatures['serving_default']
 
     def _loadDictionary(self, file):
@@ -252,22 +252,30 @@ class DataConverter():
 
 if __name__ == '__main__':
     limitGPUMemory()
-    dc = DataConverter(dict_path="Data/glove.6B.50d.txt")
+    # Specify where GloVe and FRCNN can be found
+    dc = DataConverter(dict_path="../GDrive/glove.6B.50d.txt", frcnn_path="../GDrive/rcnn/saved_model")
 
+    # Specify where the raw data can be found and where you want the normalization to be saved
     dc.createNormalization(
-        raw="Data/Datasets/RSS/raw/*.json",
-        out="Data/Datasets/RSS/normalization_v2.pkl"
+        raw="../GDrive/collected/*.json",
+        out="../GDrive/normalization_custom.pkl"
         )
 
+    # Specify where the raw data can be found and where you want the validation data to be saved
+    # Also specify how many samples should be part of the validation data
+    # Note: Depending on how many data your have, you should leave some for training
     dc.createRecord(
-        raw="Data/Datasets/RSS/raw/*.json",
-        out="Data/Datasets/RSS/validate_30000.tfrecord",
+        raw="../GDrive/collected/*.json",
+        out="../GDrive/validate_custom.tfrecord",
         max_samples=4000
         )
 
+    # Specify where the raw data can be found and where you want the training data to be saved
+    # Also specify how many samples should be part of the training data.
+    # Please also set min_samples to remove the data used for validation from the training data
     dc.createRecord(
-        raw="Data/Datasets/RSS/raw/*.json",
-        out="Data/Datasets/RSS/train_30000.tfrecord",
+        raw="../GDrive/collected/*.json",
+        out="../GDrive/train_custom.tfrecord",
         min_samples=4000,
-        max_samples=30000
+        max_samples=40000
         )

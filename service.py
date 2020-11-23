@@ -5,15 +5,8 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import sys
-if sys.version_info[0] < 3:
-    PYTHON_VERSION = 2
-    import rospy
-    from policy_translation.srv import NetworkPT, NetworkPTResponse, TuneNetwork, TuneNetworkResponse
-else:
-    PYTHON_VERSION = 3
-    import rclpy
-    from policy_translation.srv import NetworkPT, TuneNetwork
-
+import rclpy
+from policy_translation.srv import NetworkPT, TuneNetwork
 from model_src.model import PolicyTranslationModel
 from utils.network import Network
 from utils.tf_util import trainOnCPU, limitGPUMemory
@@ -30,29 +23,30 @@ import json
 import pickle
 import copy
 
+# Force TensorFlow to use the CPU
 FORCE_CPU    = True
-RUN_BASELINE = False
+# Use dropout at run-time for stochastif-forward passes
 USE_DROPOUT  = True
+# Where can we find the trained model?
+MODEL_PATH   = "../GDrive/model/policy_translation"
+# Where is a pre-trained faster-rcnn?
+FRCNN_PATH   = "../GDrive/rcnn"
+# Where are the GloVe word embeddings?
+GLOVE_PATH   = "../GDrive/glove.6B.50d.txt"
+# Where is the normalization of the dataset?
+NORM_PATH    = "../GDrive/normalization_v2.pkl"
 
 if FORCE_CPU:
     trainOnCPU()
 else:
     limitGPUMemory()
 
-if RUN_BASELINE:
-    pass
-else:
-    print("Running Policy Translation Model")
-    # model = PolicyTranslationModel(
-    #     od_path="object_detection/exported_sim_rss",
-    #     glove_path="Data/glove.6B.50d.txt",
-    #     special=None # None, atn, rnn, ff
-    # )
-    model = PolicyTranslationModel(
-        od_path="../GDrive/rcnn",
-        glove_path="../GDrive/glove.6B.50d.txt",
-        special=None # None, atn, rnn, ff
-    )
+print("Running Policy Translation Model")
+model = PolicyTranslationModel(
+    od_path=FRCNN_PATH,
+    glove_path=GLOVE_PATH,
+    special=None 
+)
 
 bs = 2
 model((
@@ -60,52 +54,27 @@ model((
     np.ones((bs, 6, 5), dtype=np.float32),
     np.ones((bs, 500, 7), dtype=np.float32)
 ))
-if RUN_BASELINE:
-    model.load_weights("Data/Model/VmzPBGDmByW/best/naive_baseline") # RNN Baseline
-else:
-    model.load_weights("../GDrive/model/policy_translation") # Best One
-    # model.load_weights("Data/IntelResults/Intel_abl_itl_1_epfinal_models/best/policy_translation") # Ablation TRJ
-    # model.load_weights("Data/IntelResults/Intel_abl_aux_2_ep300_models/best/policy_translation") # Ablation TRJ + Controller
-    # model.load_weights("Data/IntelResults/Intel_abl_aux_3_ep300_models/best/policy_translation") # Ablation TRJ +  Att
-    # model.load_weights("Data/IntelResults/Intel_abl2_mlp_atn_ep300_models/best/policy_translation") # Variant mlp attention
-    # model.load_weights("Data/IntelResults/Intel_abl2_mlp_tgt_ep350_models/best/policy_translation") # Variant mlp trajectory
-    # model.load_weights("Data/IntelResults/Intel_abl2_rnn_ep325_models/best/policy_translation") # Variant mlp trajectory
-    # model.load_weights("Data/IntelResults/Intel_ds_30000_ep300_models/best/policy_translation") # Dataset 30000 samples
-    # model.load_weights("Data/IntelResults/Intel_ds_20000_ep300_models/best/policy_translation") # Dataset 20000 samples
-    # model.load_weights("Data/IntelResults/Intel_ds_10000_epfinal_models/best/policy_translation") # Dataset 10000 samples
-    # model.load_weights("Data/IntelResults/Intel_ds_2500_v2_ep1200_models/best/policy_translation") # Dataset 10000 samples
+model.load_weights(MODEL_PATH)
 model.summary()
 
-class Otto():
+class NetworkService():
     def __init__(self):
-        self.dictionary    = self._loadDictionary("../GDrive/glove.6B.50d.txt")
+        self.dictionary    = self._loadDictionary(GLOVE_PATH)
         self.regex         = re.compile('[^a-z ]')
         self.bridge        = CvBridge()
         self.history       = []
-
-        if PYTHON_VERSION == 2:
-            rospy.init_node("neural_network")
-            self.service_nn = rospy.Service("/network", NetworkPT, self.cbk_network_dmp)
-            # self.service_tn = rospy.Service("/network/tune", TuneNetwork, self.cbk_finetune)
-            self.normalization = pickle.load(open("../GDrive/normalization_v2.pkl", mode="rb"))
-
-        elif PYTHON_VERSION == 3:
-            rclpy.init(args=None)
-            self.node = rclpy.create_node("neural_network")
-            self.service_nn = self.node.create_service(NetworkPT,   "/network",      self.cbk_network_dmp_ros2)
-            # self.service_tn = self.node.create_service(TuneNetwork, "/network/tune", self.cbk_finetune)
-            self.normalization = pickle.load(open("../GDrive/normalization_v2.pkl", mode="rb"), encoding="latin1")
+        rclpy.init(args=None)
+        self.node = rclpy.create_node("neural_network")
+        self.service_nn = self.node.create_service(NetworkPT,   "/network",      self.cbk_network_dmp_ros2)
+        self.normalization = pickle.load(open(NORM_PATH, mode="rb"), encoding="latin1")
         print("Ready")
 
     def runNode(self):
-        if PYTHON_VERSION == 2:
-            rospy.spin()
-        elif PYTHON_VERSION == 3:
-            while rclpy.ok():
-                rclpy.spin_once(self.node)
-            self.node.destroy_service(self.service_nn)
-            self.node.destroy_service(self.service_tn)
-            rclpy.shutdown()
+        while rclpy.ok():
+            rclpy.spin_once(self.node)
+        self.node.destroy_service(self.service_nn)
+        self.node.destroy_service(self.service_tn)
+        rclpy.shutdown()
 
     def _loadDictionary(self, file):
         __dictionary = {}
@@ -114,8 +83,6 @@ class Otto():
         for line in fh:
             if len(__dictionary) >= 300000:
                 break
-            if PYTHON_VERSION == 2:
-                line = line.decode("utf-8")
             tokens = line.strip().split(" ")
             __dictionary[tokens[0]] = len(__dictionary)
         fh.close()
@@ -161,7 +128,6 @@ class Otto():
         if img_msg.encoding != "8UC3":     
             self.node.get_logger().info("Unrecognized image type: " + encoding)
             exit(0)
-        # dtype, n_channels = self.encoding_to_dtype_with_channels(img_msg.encoding)
         dtype      = "uint8"
         n_channels = 3
 
@@ -176,7 +142,6 @@ class Otto():
         else:
             im = np.ndarray(shape=(img_msg.height, img_msg.width, n_channels),
                             dtype=dtype, buffer=img_buf)
-        # If the byt order is different between the message and the system.
         if img_msg.is_bigendian == (sys.byteorder == 'little'):
             im = im.byteswap().newbyteorder()
 
@@ -197,10 +162,7 @@ class Otto():
             self.req_step = 0
             self.sfp_history = []
             try:
-                if PYTHON_VERSION == 2:
-                    image = self.bridge.imgmsg_to_cv2(req.image, "bgr8")
-                elif PYTHON_VERSION == 3:
-                    image = self.imgmsg_to_cv2(req.image)
+                image = self.imgmsg_to_cv2(req.image)
             except CvBridgeError as e:
                 print(e)
             language = self.tokenize(req.language)
@@ -216,9 +178,6 @@ class Otto():
 
             boxes    = image_features["detection_boxes"][0, :6, :].numpy().astype(dtype=np.float32)
             
-            # features = image_features["detection_features"][0, :5, :, :, :].numpy().astype(dtype=np.float32)
-            # features = np.mean(features, axis=(1,2))
-
             self.features = np.concatenate((np.expand_dims(classes,1), boxes), axis=1)
 
             self.history  = []        
@@ -232,13 +191,7 @@ class Otto():
             tf.convert_to_tensor(np.tile([robot],[250, 1, 1]), dtype=tf.float32)
         )
 
-        if RUN_BASELINE:
-            generated, phase = model(self.input_data, training=tf.constant(False), use_dropout=tf.constant(USE_DROPOUT))
-            dmp_dt    = np.zeros((1,10))
-            phase     = tf.expand_dims(phase, 2)
-            weights   = np.zeros((1,7,11))
-        else:
-            generated, (atn, dmp_dt, phase, weights) = model(self.input_data, training=tf.constant(False), use_dropout=tf.constant(True))
+        generated, (atn, dmp_dt, phase, weights) = model(self.input_data, training=tf.constant(False), use_dropout=tf.constant(True))
         self.trj_gen    = tf.math.reduce_mean(generated, axis=0).numpy()
         self.trj_std    = tf.math.reduce_std(generated, axis=0).numpy()
         self.timesteps  = int(tf.math.reduce_mean(dmp_dt).numpy() * 500)
@@ -247,9 +200,6 @@ class Otto():
         phase_value     = tf.math.reduce_mean(phase, axis=0).numpy()
         phase_value     = phase_value[-1,0]
 
-        # self.history.append(self.trj_gen[-1,:].tolist()) 
-
-        # #### Future predictions from the network
         self.sfp_history.append(self.b_weights[-1,:,:])
         if phase_value > 0.95 and len(self.sfp_history) > 100:
             trj_len    = len(self.sfp_history)
@@ -266,128 +216,13 @@ class Otto():
             var_trj        = np.zeros((trj_len, trj_len, 7), dtype=np.float32)
             for w in range(trj_len):
                 gen_trajectory.append(trajectories[w,w,:])
-                # for t in range(w, trj_len):
-                #     mean = trajectories[t,t,:]
-                #     ftr  = trajectories[w,t,:]
-                #     diff = np.abs(mean - ftr)
-                #     var_trj[w,t,:] = np.asarray([max(var_trj[w,t,i], diff[i]) for i in range(7)])
             gen_trajectory = np.asarray(gen_trajectory)
             np.save("gen_trajectory", gen_trajectory)            
-            # print(var_trj[0].shape)
-            # for fid in range(0,trj_len):
-            #     print("{}/{}".format(fid, trj_len))
-            #     fig, ax = plt.subplots(3,3)
-            #     fig.set_size_inches(9, 9)
-            #     for sp in range(7):
-            #         idx = sp // 3
-            #         idy = sp  % 3
-            #         ax[idx,idy].clear()
 
-            #         # GT Trajectory:
-            #         ax[idx,idy].plot(range(fid), gen_trajectory[:fid,sp], alpha=0.75, linewidth=3, color='mediumslateblue')
-            #         # ax[idx,idy].errorbar(range(trj_len), gen_trajectory[:,sp], xerr=None, yerr=var_trj[fid,:,sp], alpha=0.2, fmt='none', color='mediumslateblue')
-            #         # for line in range(fid,trj_len):
-            #         ax[idx,idy].plot(range(fid, trj_len), trajectories[fid,fid:,sp], alpha=0.5, color='orange')
-
-            #         ax[idx,idy].set_ylim([-0.1, 1.1])
-            #     # plt.show()
-            #     # break
-            #     plt.savefig("Data/Images/1_" + str(fid).zfill(3) + ".png", dpi=100)
-            #     plt.close()            
-            # fig, ax = plt.subplots(3,3)
-            # fig.set_size_inches(9, 9)
-            # for fid in range(0,trj_len):
-            #     for sp in range(7):
-            #         idx = sp // 3
-            #         idy = sp  % 3
-            #         ax[idx,idy].clear()
-            #         # GT Trajectory:
-            #         if fid == trj_len -1:
-            #             ax[idx,idy].plot(range(trj_len), gen_trajectory[:,sp], alpha=0.75, linestyle=":", linewidth=1, color='mediumslateblue')
-            #         # ax[idx,idy].errorbar(range(trj_len), gen_trajectory[:,sp], xerr=None, yerr=var_trj[fid,:,sp], alpha=0.2, fmt='none', color='mediumslateblue')
-            #         # for line in range(fid,trj_len):
-            #         ax[idx,idy].plot(range(fid, trj_len), trajectories[fid,fid:,sp], alpha=1, color='orange')
-            #         # ax[idx,idy].set_ylim([-0.1, 1.1])
-            # # plt.savefig("Data/Images/1_" + str(fid).zfill(3) + ".png", dpi=100)
-            # plt.show()
             self.sfp_history = []
-
-        #### Just plots the image regions
-        # if req.reset:
-        #     self.plotImageRegions(image, image_features, tf.math.reduce_mean(atn, axis=0).numpy())
-        #     plt.show()
-
-        #### Predicting stuff into the future by feeding the output directly back to the network
-        # tmp = copy.deepcopy(self.history)
-        # tmp.append(self.trj_gen[-1,:].tolist())
-        # if True:
-        #     n_cut           = 150    
-        #     while len(tmp) < n_cut:
-        #         robot           = np.asarray(tmp , dtype=np.float32)
-        #         self.input_data = (
-        #             tf.convert_to_tensor(np.tile([self.language],[250, 1]), dtype=tf.int64), 
-        #             tf.convert_to_tensor(np.tile([self.features],[250, 1, 1]), dtype=tf.float32),
-        #             tf.convert_to_tensor(np.tile([robot],[250, 1, 1]), dtype=tf.float32)
-        #         )
-        #         generated, (_, _, _, _) = model(self.input_data, training=tf.constant(False), use_dropout=tf.constant(True))
-        #         tmp.append(tf.math.reduce_mean(generated, axis=0).numpy()[-1,:])
-        #     self.sfp_history.append(np.asarray(tmp))
-        # if len(self.history) == n_cut:
-        #     fig, ax = plt.subplots(3,3)
-        #     fig.set_size_inches(9, 9)
-        #     for i in range(len(self.sfp_history)):
-        #         for sp in range(7):
-        #             idx = sp // 3
-        #             idy = sp  % 3
-        #             ax[idx,idy].clear()
-        #             for i in range(len(self.sfp_history)):
-        #                 ax[idx, idy].plot(range(self.sfp_history[i].shape[0]), self.sfp_history[i][:,sp], color='mediumslateblue', alpha=0.1)
-        #             ax[idx,idy].set_ylim([-0.1, 1.1])
-        #     plt.show()            
-
-        #### Actual stochastic forward passes
-        # n_passes = 5
-        # self.sfp_history.append(generated.numpy()[:n_passes,-1,:])
-        # sfp_len = len(self.sfp_history)
-        # print(sfp_len)
-        # if sfp_len == n_cut:
-        #     fig, ax = plt.subplots(3,3)
-        #     fig.set_size_inches(9, 9)
-        #     for sp in range(7):
-        #         idx = sp // 3
-        #         idy = sp  % 3
-        #         ax[idx,idy].clear()
-        #         for i in range(sfp_len):
-        #             ax[idx, idy].scatter(np.ones((n_passes)) * i, self.sfp_history[i][:,sp], color='mediumslateblue', alpha=0.1)
-        #         ax[idx,idy].set_ylim([-0.1, 1.1])
-        #     plt.show()
-
-        # if req.plot or self.req_step == 0:
-        #     tgt_object = np.argmax(tf.math.reduce_mean(atn, axis=0))
-        #     print("Task Summary:")
-        #     print("  Sentence: " + req.language)
-        #     print("  Target Object: {} (Confidence: {:.3f})".format(self.idToText(int(classes[tgt_object])), tf.math.reduce_mean(atn, axis=0)[tgt_object]))
-        #     print("  Timesteps", self.timesteps)
-        #     irb = boxes[tgt_object]
-        #     h,w,_ = image.shape
-        #     img = image[int(h*irb[0]):int(h*irb[2]),int(w*irb[1]):int(w*irb[3]),:]
-        #     # self.plotTrajectory(self.trj_gen, self.trj_std, img)
-        #     self.plotImageRegions(image, image_features, tf.math.reduce_mean(atn, axis=0).numpy())
-        #     plt.savefig("/home/sstepput/Desktop/NueIPS Figures/color/{}.png".format(np.random.randint(0, 10000)))
-        #     plt.close()
-        #     plt.show()
         
         self.req_step += 1
-        if PYTHON_VERSION == 3:
-            return (self.trj_gen.flatten().tolist(), self.trj_std.flatten().tolist(), self.timesteps, self.b_weights.flatten().tolist(), float(phase_value)) 
-          
-        response            = NetworkPTResponse()
-        response.trajectory = self.trj_gen.flatten().tolist()
-        response.confidence = self.trj_std.flatten().tolist()
-        response.timesteps  = self.timesteps
-        response.weights    = self.dmp_w_mean.flatten().tolist()
-        response.phase      = phase_value
-        return response
+        return (self.trj_gen.flatten().tolist(), self.trj_std.flatten().tolist(), self.timesteps, self.b_weights.flatten().tolist(), float(phase_value)) 
     
     def idToText(self, id):
         names = ["", "Yellow Small Round", "Red Small Round", "Green Small Round", "Blue Small Round", "Pink Small Round",
@@ -424,12 +259,10 @@ class Otto():
             if i == tgt_object:
                 image_np = cv2.rectangle(image_np, pt1, pt2, (30, 156, 2), 2)
                 image_np = cv2.putText(image_np, "{:.1f}%".format(atn[i] * 100), (pt1[0]-10, pt1[1]-5), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (30, 156, 2), 2, cv2.LINE_AA)
-            # image_np = cv2.putText(image_np, self.idToText(int(image_dict['detection_classes'][0][i].numpy())) + " {:.1f}%".format(image_dict["detection_scores"][0][i] * 100), pt1, cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1, cv2.LINE_AA)
-            # image_np = cv2.putText(image_np, "{:.1f}%".format(atn[i] * 100), pt1, cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 1, cv2.LINE_AA)
-
+            
         fig = plt.figure()
         plt.imshow(image_np)
     
 if __name__ == "__main__":
-    ot = Otto()
+    ot = NetworkService()
     ot.runNode()

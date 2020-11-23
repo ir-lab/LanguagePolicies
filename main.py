@@ -15,10 +15,28 @@ import shutil
 import os.path
 import sys
 
-trainOnCPU()
+# Location of the training data
 TRAIN_DATA      = "../GDrive/train.tfrecord"
+# Location of the validation data
 VALIDATION_DATA = "../GDrive/validate.tfrecord"
-TRAIN_VAR       = "../GDrive/train_{}.tfrecord"
+# Location of the GloVe word embeddings
+GLOVE_PATH      = "../GDrive/glove.6B.50d.txt"
+# Learning rate for the adam optimizer
+LEARNING_RATE   = 0.0001
+# Weight for the attention loss
+WEIGHT_ATTN     = 1.0
+# Weight for the motion primitive weight loss
+WEIGHT_W        = 50.0
+# Weight for the trajectroy generation loss
+WEIGHT_TRJ      = 5.0
+# Weight for the time progression loss
+WEIGHT_DT       = 14.0
+# Weight for the phase prediction loss
+WEIGHT_PHS      = 1.0
+# Number of epochs to train
+TRAIN_EPOCHS    = 200
+
+trainOnCPU()
 
 hid             = hashids.Hashids()
 LOGNAME         = hid.encode(int(time.time() * 1000000))
@@ -70,10 +88,10 @@ class DatasetRSS():
 
 def setupModel():
     print("  --> Running with default settings")
-    model   = PolicyTranslationModel(od_path="", glove_path="../GDrive/glove.6B.50d.txt")
-    network = Network(model, logname=LOGNAME, lr=0.0001, lw_atn=1.0, lw_w=50.0, lw_trj=5.0, lw_dt=14.0, lw_phs=1.0)
+    model   = PolicyTranslationModel(od_path="", glove_path=GLOVE_PATH)
+    network = Network(model, logname=LOGNAME, lr=LEARNING_RATE, lw_atn=WEIGHT_ATTN, lw_w=WEIGHT_W, lw_trj=WEIGHT_TRJ, lw_dt=WEIGHT_DT, lw_phs=WEIGHT_PHS)
     network.setDatasets(train=DatasetRSS(TRAIN_DATA), validate=DatasetRSS(VALIDATION_DATA))
-    network.train(epochs=400)
+    network.train(epochs=TRAIN_EPOCHS)
     return network
 
 network = setupModel()

@@ -6,7 +6,6 @@ import rclpy
 from policy_translation.srv import NetworkPT
 from pyrep import PyRep
 from pyrep.objects.vision_sensor import VisionSensor
-# from utils.pa_baseline_link import PABaseline
 from utils.voice import Voice
 import sys
 import select
@@ -23,9 +22,22 @@ import os
 import matplotlib.pyplot as plt
 from PIL import Image
 
+# Default robot position. You don't need to change this
 DEFAULT_UR5_JOINTS  = [105.0, -30.0, 120.0, 90.0, 60.0, 90.0]
+# Evaluate headless or not
 HEADLESS            = False
+# This is a debug variable... 
 USE_SHAPE_SIZE      = True
+# Run on the test data, or start the simulator in manual mode 
+# (manual mode will allow you to generate environments and type in your own commands)
+RUN_ON_TEST_DATA    = True
+# How many of the 100 test-data do you want to test?
+NUM_TESTED_DATA     = 100
+# Where to find the normailization?
+NORM_PATH           = "../GDrive/normalization_v2.pkl"
+# Where to find the VRep scene file. This has to be an absolute path. 
+VREP_SCENE          = "../GDrive/NeurIPS2020.ttt"
+VREP_SCENE          = os.getcwd() + "/" + VREP_SCENE
 
 class Simulator(object):
     def __init__(self, args=None):
@@ -39,13 +51,13 @@ class Simulator(object):
         self.node.get_logger().info("... service found!")
 
         self.pyrep = PyRep()
-        self.pyrep.launch("../GDrive/NeurIPS2020.ttt", headless=HEADLESS)
+        self.pyrep.launch(VREP_SCENE, headless=HEADLESS)
         self.camera = VisionSensor("kinect_rgb_full")
         self.pyrep.start()
 
         self.trajectory    = None
         self.global_step   = 0
-        self.normalization = pickle.load(open("../GDrive/normalization_v2.pkl", mode="rb"), encoding="latin1")
+        self.normalization = pickle.load(open(NORM_PATH, mode="rb"), encoding="latin1")
         self.voice         = Voice(load=False)  
 
         self.shape_size_replacement = {}
@@ -99,15 +111,11 @@ class Simulator(object):
                                             ints=(), floats=joints, strings=(), bytes="")
 
     def _setJointVelocityFromTarget(self, joints):
-        # self._setJointVelocityFromTarget_Direct(joints)
-        # return
         _, s, _, _ = self.pyrep.script_call(function_name_at_script_name="setJointVelocityFromTarget@control_script",
                                         script_handle_or_type=1,
                                         ints=(), floats=joints, strings=(), bytes="")
 
     def _setJointVelocityFromTarget_Direct(self, joints):
-        # self._setJointVelocityFromTarget(joints)
-        # return
         _, s, _, _ = self.pyrep.script_call(function_name_at_script_name="setJointVelocityFromTarget_Direct@control_script",
                                         script_handle_or_type=1,
                                         ints=(), floats=joints, strings=(), bytes="")
@@ -199,7 +207,6 @@ class Simulator(object):
         return img_msg
     
     def predictTrajectory(self, voice, state, cnt):
-        # self.node.get_logger().info("Predicting trajectory for command: " + voice)
         norm         = np.take(self.normalization["values"], indices=[0,1,2,3,4,5,30], axis=1)
         image        = self._getCameraImage()
 
@@ -217,7 +224,6 @@ class Simulator(object):
         rclpy.spin_until_future_complete(self.node, future)
         try:
             result = future.result()
-            # self.node.get_logger().info("Received result!")
         except Exception as e:
             self.node.get_logger().info('Service call failed %r' % (e,))
             return False
@@ -251,7 +257,6 @@ class Simulator(object):
         return value
 
     def _generalizeVoice(self, voice):
-        voice = self.voice.createTestSentence(voice)
         return voice
 
     def _mapObjectIDs(self, oid):
@@ -330,7 +335,6 @@ class Simulator(object):
         return result
 
     def _maybeDropBall(self, state):
-        # print(state[5])
         res = 0
         if state[5] > 3.0:
             self._dropBall(1)
@@ -380,7 +384,6 @@ class Simulator(object):
         return data
 
     def valPhase1(self, files, feedback=True):
-        # MOTION_PERTUBATION = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         successfull = 0
         val_data    = {}
         nn_trajectory  = []
@@ -429,7 +432,6 @@ class Simulator(object):
         return successfull, val_data
     
     def valPhase2(self, files, feedback=True):
-        # MOTION_PERTUBATION  = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
         successfull         = 0
         val_data            = {}
         for fid, fn in enumerate(files):
@@ -561,30 +563,61 @@ class Simulator(object):
         self.node.get_logger().info("Created new environment")
         return ints, floats
 
-    def predictTrajectoryBaseline(self, voice, state, ret_phs, cnt, image_path=None):
-        self.baseline.reset()
-        # Prepare Data
-        norm           = np.take(self.normalization["values"], indices=[0,1,2,3,4,5,30], axis=1)
-        if image_path is None:
-            image = self._getCameraImage()
-            image = Image.fromarray(image[:,:,::-1])
-            image.save("/home/sstepput/Development/SemanticPolicy/Data/Baselines/tmp/live.jpg")
-            image_path = "/home/sstepput/Development/SemanticPolicy/Data/Baselines/tmp/live.jpg"
-            voice = self.simplifyVoice(voice)
-
-        # Run model
-        trajectory, phase = self.baseline.predictTrajectory(voice, image_path)       
-        return trajectory, ret_phs
-
     def simplifyVoice(self, voice):
         simple = []
         for word in voice.split(" "):
             if word in self.voice.basewords.keys():
                 simple.append(self.voice.basewords[word])
         return " ".join(simple)
+
+    def parseInput(self, d_in):
+        if d_in == "q":
+            return False
+        if d_in == "g":
+            self.rm_voice     = ""
+            self.last_gripper = 0.0
+            self._generateEnvironment()
+        if d_in == "r":
+            self.rm_voice     = ""
+            self.last_gripper = 0.0
+            self.node.get_logger().info("Resetting robot")
+            self._resetEnvironment()
+        elif d_in.startswith("t "):
+            self.rm_voice = d_in[2:]
+            self.cnt      = 0
+            print("Running Task: " + self.rm_voice)
+        elif self.rm_voice != "" and  d_in == "":
+            self.cnt += 1
+            tf_trajectory, phase = self.predictTrajectory(self.rm_voice, self._getRobotState(), self.cnt)
+            r_state              = tf_trajectory[-1,:]
+            self.last_gripper    = r_state[6]
+            self._setJointVelocityFromTarget(r_state)
+            self._maybeDropBall(r_state)
+
+            if phase >=0.95:
+                self.node.get_logger().info("Finished running trajectory with " + str(self.cnt) + " steps")
+                self._stopRobotMovement()
+                self.rm_voice = ""
+
+        return True
+    
+    def runManually(self):
+        self.rm_voice = ""
+        run  = True
+        while run:
+            self.pyrep.step()
+            if select.select([sys.stdin,],[],[],0.0)[0]:
+                line = sys.stdin.readline()
+                run = self.parseInput(line[:-1])
+            else:
+                self.parseInput("")    
+        print("Shutting down...")
   
 if __name__ == "__main__":
     sim = Simulator()
-    sim.evalDirect(runs=10)
+    if RUN_ON_TEST_DATA:
+        sim.evalDirect(runs=NUM_TESTED_DATA)
+    else:
+        sim.runManually()
     sim.shutdown()
     

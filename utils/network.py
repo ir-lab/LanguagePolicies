@@ -42,7 +42,6 @@ class Network():
 
     def train(self, epochs):
         self.global_step = 0
-        # self.runValidation()
         for epoch in range(epochs):
             print("Epoch: {:3d}/{:3d}".format(epoch+1, epochs)) 
             validation_loss = 0.0
@@ -67,32 +66,12 @@ class Network():
             self._uploadToCloud()
     
     def _uploadToCloud(self, epoch=None):
-        print("Sending results to server...")
-        if epoch is None:
-            epoch = "final"
-        zip_name = "{}_{}_ep{}_".format(self.logname, self.instance_name, epoch)
-
-        shutil.make_archive("Data/" + zip_name + "models", "xztar", "Data/Model/Intel")
-        shutil.make_archive("Data/" + zip_name + "logs",   "xztar", "Data/TBoardLog/Intel")
-
-        try:
-            self._curlUpload("Data/" + zip_name + "models.tar.xz")
-            self._curlUpload("Data/" + zip_name + "logs.tar.xz")
-        except:
-            # print(sys.exc_info()[0])
-            print("Failed to upload results to cloud.")
-            print("  Keeping local files, skipping uploads...")
+        # Not available in public version
+        pass
 
     def _curlUpload(self, path):
-        curl = pycurl.Curl()
-        curl.setopt(curl.UPLOAD, 1)
-        curl.setopt(curl.READFUNCTION, open(path, "rb").read)
-        curl.setopt(curl.INFILESIZE, os.stat(path).st_size)
-        curl.setopt(curl.USERPWD, "zJ3aPQMXSPw4cQR:5P#m*l85G3bGQtSB")
-        curl.setopt(curl.HTTPHEADER, ["X-Requested-With: XMLHttpRequest"])
-        curl.setopt(curl.URL, "https://cloud.simonstepputtis.com/public.php/webdav/" + path.split("/")[-1])
-        curl.perform()
-        curl.close()
+        # Not available in public version
+        pass
     
     def runValidation(self, quick=False, pnt=True): 
         if not quick:

@@ -7,7 +7,12 @@ from sklearn.metrics import mean_absolute_error
 import pickle
 from utils.voice import Voice
 
-normalization = pickle.load(open("../GDrive/normalization_v2.pkl", mode="rb"), encoding="latin1")
+# Where to find the results file?
+FILE_PATH = "ours_full_cl.json"
+# Where to find the normalization
+NORM_PATH = "../GDrive/normalization_v2.pkl"
+
+normalization = pickle.load(open(NORM_PATH, mode="rb"), encoding="latin1")
 norm          = np.take(normalization["values"], indices=[0,1,2,3,4,5,30], axis=1)
 voice_class   = Voice(load=False)
 
@@ -264,7 +269,7 @@ def cleanJson(data):
     return data
 
 if __name__ == "__main__":
-    path = "val_result.json"
+    path = FILE_PATH
 
     with open(path, "r") as fh:
         data = json.load(fh)
