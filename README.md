@@ -17,10 +17,10 @@ When using this code and/or model, we would apprechiate the following citation:
 ```
 
 ## Inddex
-1. [Environment Setup](#environment\ setup)
-      - [Local Setup](#local_setup)
+1. [Environment Setup](#environment-setup)
+      - [Local Setup](#local-setup)
       - [Docker](#docker)
-2. [Quick Start](#quick\ start)
+2. [Quick Start](#quick-start)
       - [Details: Data Collection](doc/data_collection.md)
       - [Details: Training and Evaluation](doc/evaluation.md)
 3. [Results](#results)
@@ -87,7 +87,7 @@ python viz_val_vrep.py
 We summarize the results of testing our model on a set of 100 unseen, new environments. Our model's overall task success describes the percentage of cases in which the cup was first lifted, and then successfully poured into the correct bowl. This sequence of steps was successfully executed in 84% of the new environments. Picking alone achieves a 98% success rate while pouring results in 85%. The _Detection_ rate indicates the success rate of the semantic model, attempting to identify the correct objects. _Content-In-Bowl_ outlines the percentage of material that was delivered to the correct bowl during the pouring action. Finally, we report the mean-absolute-error of the robot's joint configuration. These results indicate that the model appropriately generalizes the trained behavior to changes in object position, verbal command, or perceptual input. In additon, we also compared the models performance to a simple RNN approach and a recent state-of-the-art baseline ("_Pay attention!-robustifying a deep visuomotor policy through task-focused visual attention_" Abolghasemi et. al.):
 
 | Model              | Picking         | Pouring        | Sequential         | Detection | Content-In-Bowl | MAE (Joints, Radiant)  |
-| ------------------ | :-------------: | :------------: | :----------------: | :-------: | :-------------: | :--: |
+| ------------------ | :-------------: | :------------: | :----------------: | :-------: | :-------------: | :--------: |
 | __Simple RNN__     |     58%         |      0%        | 0%                 | 52%       | 7%              | 0.30&#176; |
 | __PayAttention!__  |     23%         |      8%        | 0%                 | 66%       | 41%             | 0.13&#176; |
 | __Ours__           |     98%         |      85%       | 84%                | 94%       | 94%             | 0.05&#176; |
