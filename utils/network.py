@@ -144,10 +144,7 @@ class Network():
 
         weight_dim  = [3.0, 3.0, 3.0, 1.0, 0.5, 1.0, 0.1]
         
-        if self.model.special == "atn":
-            atn_loss = 0
-        else:
-            atn_loss = self.loss(y_true=attention, y_pred=atn)
+        atn_loss = self.loss(y_true=attention, y_pred=atn)
 
         dt_loss  = tf.math.reduce_mean(tf.keras.metrics.mean_squared_error(delta_t, dmp_dt[:,0]))
         

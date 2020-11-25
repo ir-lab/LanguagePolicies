@@ -10,7 +10,6 @@ class FeedbackController(tf.keras.layers.Layer):
         self.state_size       = rnn_state_size
         self.dims             = dimensions
         self.n_bfuncs         = basis_functions
-        self.special          = special
 
     def build(self, input_shape):
         self.robot_gru      = tf.keras.layers.GRUCell(units=self.robot_state_size)
@@ -22,11 +21,7 @@ class FeedbackController(tf.keras.layers.Layer):
         self.phase_dense_1 = tf.keras.layers.Dense(units=int(self.robot_state_size / 2.0), activation=tf.keras.activations.relu)
         self.phase_dense_2 = tf.keras.layers.Dense(units=1, activation=tf.keras.activations.hard_sigmoid)
 
-        if self.special == "ff":
-            self.flatten    = tf.keras.layers.Flatten()
-            self.basismodel = tf.keras.layers.Dense(units=7, activation=tf.keras.activations.linear)
-        else:
-            self.basismodel = BasisModel(dimensions=self.dims, nfunctions=self.n_bfuncs, scale=0.012)
+        self.basismodel = BasisModel(dimensions=self.dims, nfunctions=self.n_bfuncs, scale=0.012)
 
     # @tf.function
     def call(self, inputs, states, constants=None, training=False, mask=None, **kwargs):
@@ -54,11 +49,7 @@ class FeedbackController(tf.keras.layers.Layer):
         phase = phase + dt
 
         # Apply basis model:
-        if self.special == "ff":
-            d_in   = tf.keras.backend.concatenate((self.flatten(weights), phase), axis=1)
-            action = self.basismodel(d_in)
-        else:
-            action, _ = self.basismodel((weights, tf.zeros_like(weights), phase))
+        action, _ = self.basismodel((weights, tf.zeros_like(weights), phase))
         action = tf.squeeze(action)
 
         # Rebuild the state:

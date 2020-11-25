@@ -8,28 +8,9 @@ from model_src.dmp import DynamicMovementPrimitive
 from model_src.basismodel import BasisModel
 from model_src.feedbackcontroller import FeedbackController
 
-class SimpleAttention(tf.keras.layers.Layer):
-    def __init__(self, **kwarg):
-        super(SimpleAttention, self).__init__(name="attention", **kwarg)
-
-    def build(self, input_shape):
-        self.ft = tf.keras.layers.Flatten()
-        self.w1 = tf.keras.layers.Dense(units=32, activation=tf.keras.activations.relu)
-        self.w2 = tf.keras.layers.Dense(units=6, activation=tf.keras.activations.relu)
-
-    def call(self, inputs, training=None):
-        language = inputs[0]
-        features = inputs[1]
-        features = self.ft(features)
-        d_in     = tf.keras.backend.concatenate((language, features), axis=1)
-        result   = self.w2(self.w1(d_in))
-
-        return result
-
 class PolicyTranslationModel(tf.keras.Model):
     def __init__(self, od_path, glove_path, special=None):
         super(PolicyTranslationModel, self).__init__(name="policy_translation")
-        self.special             = special
         self.units               = 32
         self.output_dims         = 7
         self.basis_functions     = 11
@@ -43,10 +24,7 @@ class PolicyTranslationModel(tf.keras.Model):
         self.embedding = GloveEmbeddings(file_path=glove_path)
         self.lng_gru   = tf.keras.layers.GRU(units=self.units)
 
-        if self.special == "atn":
-            self.attention = SimpleAttention()
-        else:
-            self.attention = TopDownAttention(units=64)
+        self.attention = TopDownAttention(units=64)
 
         self.dout      = tf.keras.layers.Dropout(rate=0.25)
 
@@ -56,20 +34,15 @@ class PolicyTranslationModel(tf.keras.Model):
         self.pt_dt_1   = tf.keras.layers.Dense(units=self.units * 2, activation=tf.keras.activations.relu)
         self.pt_dt_2   = tf.keras.layers.Dense(units=1, activation=tf.keras.activations.hard_sigmoid)
 
-        if self.special == "rnn":
-            self.lstm1 = tf.keras.layers.LSTM(units=32, return_sequences=True)
-            self.lstm2 = tf.keras.layers.LSTM(units=16, return_sequences=True)
-            self.lstm3 = tf.keras.layers.LSTM(units=8, return_sequences=True)
-        else:
-            self.controller = tf.keras.layers.RNN(
-                FeedbackController(
-                    robot_state_size = self.units, 
-                    rnn_state_size   = (tf.TensorShape([self.output_dims]), tf.TensorShape([self.units])),
-                    dimensions       = self.output_dims, 
-                    basis_functions  = self.basis_functions,
-                    special          = self.special
-                ), 
-            return_sequences=True)
+        self.controller = tf.keras.layers.RNN(
+            FeedbackController(
+                robot_state_size = self.units, 
+                rnn_state_size   = (tf.TensorShape([self.output_dims]), tf.TensorShape([self.units])),
+                dimensions       = self.output_dims, 
+                basis_functions  = self.basis_functions,
+                special          = None
+            ), 
+        return_sequences=True)
            
     @tf.function
     def call(self, inputs, training=False, use_dropout=True):
@@ -88,14 +61,11 @@ class PolicyTranslationModel(tf.keras.Model):
 
         # Calculate attention and expand it to match the feature size
         atn = self.attention((language, features))
-        if self.special == "atn":
-            cfeatures = atn
-        else:
-            atn_w = tf.expand_dims(atn, 2)
-            atn_w = tf.tile(atn_w, [1, 1, 5])
-            # Compress image features and apply attention
-            cfeatures = tf.math.multiply(atn_w, features)
-            cfeatures = tf.math.reduce_sum(cfeatures, axis=1)
+        atn_w = tf.expand_dims(atn, 2)
+        atn_w = tf.tile(atn_w, [1, 1, 5])
+        # Compress image features and apply attention
+        cfeatures = tf.math.multiply(atn_w, features)
+        cfeatures = tf.math.reduce_sum(cfeatures, axis=1)
 
         # Add the language to the mix again. Possibly usefull to predict dt
         start_joints  = robot[:,0,:]
@@ -108,21 +78,11 @@ class PolicyTranslationModel(tf.keras.Model):
         # dmp_dt      = d_out[2]
 
         # Run the low-level controller
-        if self.special == "rnn":
-            d_in = tf.keras.backend.concatenate((cfeatures, dmp_dt), axis=1)
-            d_in = tf.expand_dims(d_in, 1)
-            d_in = tf.tile(d_in, [1, tf.shape(robot)[1], 1])
-            d_in = tf.keras.backend.concatenate((robot, d_in), axis=2)
-            result = self.lstm3(self.lstm2(self.lstm1(d_in)))
-            generated = result[:,:,:7]
-            phase     = tf.expand_dims(result[:,:,7],2)
-            weights   = tf.zeros((16, tf.shape(robot)[1], 7, 11), dtype=tf.float32)
-        else:
-            initial_state = [
-                start_joints,
-                tf.zeros(shape=[batch_size, self.units], dtype=tf.float32)
-            ]
-            generated, phase, weights = self.controller(inputs=robot, constants=(cfeatures, dmp_dt), initial_state=initial_state, training=training)
+        initial_state = [
+            start_joints,
+            tf.zeros(shape=[batch_size, self.units], dtype=tf.float32)
+        ]
+        generated, phase, weights = self.controller(inputs=robot, constants=(cfeatures, dmp_dt), initial_state=initial_state, training=training)
 
         return generated, (atn, dmp_dt, phase, weights)
     

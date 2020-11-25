@@ -1,5 +1,5 @@
 # Language-Conditioned Imitation Learning for Robot Manipulation Tasks
-This repository is the official implementation of [Language-Conditioned Imitation Learning for Robot Manipulation Tasks](https://arxiv.org/abs/2010.12083). 
+This repository is the official implementation of [Language-Conditioned Imitation Learning for Robot Manipulation Tasks](https://arxiv.org/abs/2010.12083), which has been accepted to NeurIPS 2020 as spotlight presentation.
 
 <div style="text-align:center"><img src="doc/system.png" alt="Model figure" width="80%"/></div>
 
