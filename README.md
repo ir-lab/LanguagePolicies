@@ -3,7 +3,7 @@ This repository is the official implementation of [Language-Conditioned Imitatio
 
 <div style="text-align:center"><img src="doc/system.png" alt="Model figure" width="80%"/></div>
 
-When using this code and/or model, we would apprechiate the following citation:
+When using this code and/or model, we would appreciate the following citation:
 ```
 @misc{stepputtis2020languageconditioned,
       title={Language-Conditioned Imitation Learning for Robot Manipulation Tasks}, 
@@ -46,7 +46,7 @@ To run the model, you need to download the __dataset__, __pre-trained model__, a
 The downloaded file should be placed next to the root folder of this repository. The folder _LanguagePolicies_ and the extracted _GDrive_ should reside in the same directory. 
 
 ### Docker
-If you rather look at this code in a Docker container, we provided a Dockerfile with this repository. To build the container, run the following 
+If you would rather look at this code in a Docker container, we provide a Dockerfile with this repository. To build the container, run the following:
 ```
 docker build -t languagepolicies .
 ```
@@ -94,7 +94,7 @@ We summarize the results of testing our model on a set of 100 unseen, new enviro
 
 Further results can be found in our [Additional Results](doc/detailed_results.md) page.
 
-An execution of our model in a specific environment is shown below. First, the languaage command _Rais the green cup_ and an image of the current environment is given to the model. This allows the robot to identify the target object in the current environment, as well as and desired action. After the cup has been picked up, a second comand _Fill all of it into the small red bowl_ is issued and processed in the same environment. In addition to identify the target bowl and action (the _what_ and _where_), the robot also identifies a quantity modifier, used to describe _how_ the robot should execute the described task. In this case, all of the cup's content is filled into the target bowl. 
+An execution of our model in a specific environment is shown below. First, the language command _Raise the green cup_ and an image of the current environment is given to the model. This allows the robot to identify the target object in the current environment, as well as and desired action. After the cup has been picked up, a second comand _Fill all of it into the small red bowl_ is issued and processed in the same environment. In addition to identifying the target bowl and action (the _what_ and _where_), the robot also identifies a quantity modifier, used to describe _how_ the robot should execute the described task. In this case, all of the cup's content is filled into the target bowl. 
 
 <div style="float:left">
       <img src="doc/model.gif" alt="" width="49%"/>
