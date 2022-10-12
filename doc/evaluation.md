@@ -9,7 +9,7 @@ This will run the training with our default parameters on the full dataset that 
 
 
 ### Custom Training
-Should you have collected data following the [Data Collection](data_collection.md) tutorial, you can use your dataset by changed the parameters in _main.py_ according to your needs. The respective parameters can be found in line 18 to 35.
+Should you have collected data following the [Data Collection](data_collection.md) tutorial, you can use your dataset by changing the parameters in _main.py_ according to your needs. The respective parameters can be found in line 18 to 35.
 
 ### Hyper-Parameters
 The following hyperparameters are used in our default configuration and represent the used learning rate as well as the weights used for the auxiliary losses. 
@@ -18,7 +18,7 @@ A reasonable range for each parameter was determined before the automated parame
 The automated search for suitable parameters was conducted by _sklearn.model\_selection.RandomizedSearchCV_
 
 
-| Lerning Rate                | Attention Weight           | Weight difference      | Trajectory Reconstruction     | Phase Progression     | Phase Estimation     |
+| Learning Rate                | Attention Weight           | Weight difference      | Trajectory Reconstruction     | Phase Progression     | Phase Estimation     |
 | --------------------------- | -------------------------- | ---------------------  | ----------------------------- | --------------------- | -------------------- |
 | **0.0001** [0.01 - 0.00005] | **1.0** [fixed reference]  | **50.0** [0.1 - 100.0] | **5.0** [0.1 - 30]            | **14.0** [0.1 - 30]   | **1.0** [0.1 - 30]   |
 
