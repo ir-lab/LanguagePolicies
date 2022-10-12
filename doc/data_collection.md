@@ -37,7 +37,7 @@ Data is collected in a JSON format, saving all relevant information about the en
 - __target/id__: The id of the target object. See the table below for id descriptions
 - __target/type__: Type of the target, either _cup_ or _bowl_
 - __trajectory__: The initially generated trajectory that is executed by the robot during data collection. This trajectory has been automatically generated to fulfill the desired task.
-- __name__: The name of this demonstration. Overall, there will be two files with the same name. One for the pocking, one for the pouring action.
+- __name__: The name of this demonstration. Overall, there will be two files with the same name. One for the picking, one for the pouring action.
 - __phase__: Either 0 or 1, where 0 indicates the picking and 1 indicates the pouring action. Note that the file names are using 1 for picking and 2 for pouring.
 - __image__: An array containing the top-down image of the environment in uint8 format. 
 - __ints__: Describes how many and which cups and bowls are in the environment. Index 0 holds the number of bowls, index 1 the number of cups, followed by the bowl and cup ids used. See the table below for a description of the ids.
