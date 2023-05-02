@@ -15,16 +15,17 @@ import json
 from voice import Voice
 from joblib import Parallel, delayed
 import os
+import copy
 
 # How many processes shold collect data in parallel? 
 # A good measure is to put the number of CPU cores you have (Note that each process needs ~1GB of RAM also)
-PROCESSES           = 4
+PROCESSES           = 1
 # How many demonstrations (picking and pouring) should each process collect? 
-SAMPLES_PER_PROCESS = 10
+SAMPLES_PER_PROCESS = 1
 # Ever n demonstrations, VRep will be restarted entirely, not just the simulation. You don't need to change this
 RESET_EACH          = 20
 # If you run more than 1 process, you should run VRep headless
-VREP_HEADLESS       = True
+VREP_HEADLESS       = False
 # Default position of the UR5 robot. You do not need to change this
 DEFAULT_UR5_JOINTS  = [105.0, -30.0, 120.0, 90.0, 60.0, 90.0]
 # Path to the UR5 URDF file
@@ -64,19 +65,24 @@ class SimulatorState(object):
         return self.array
 
 class Robot(object):
-    def __init__(self):
+    def __init__(self, test=False):
         kdl_tree           = kdl_parser_py.treeFromFile(ROBOT_URDF)[1]
         self.offsets       = np.deg2rad([90.0, -90.0, 0.0, -90.0, 0.0, 0.0])
         self.base_joints   = np.deg2rad(DEFAULT_UR5_JOINTS)
-        transform          = kdl_tree.getChain("world", "tcp")
+        self.transform     = kdl_tree.getChain("world", "tcp")
 
-        self.kdl_fk        = kdl.ChainFkSolverPos_recursive(transform)
-        self.kdl_ik        = kdl.ChainIkSolverPos_LMA(transform)
-        self.kdl_input     = kdl.JntArray(transform.getNrOfJoints())
-        self.kdl_output    = kdl.JntArray(transform.getNrOfJoints())
-        self.num_joints    = transform.getNrOfJoints()
+        self.kdl_fk        = kdl.ChainFkSolverPos_recursive(self.transform)
+        self.kdl_ik        = kdl.ChainIkSolverPos_LMA(self.transform)
+        self.kdl_input     = kdl.JntArray(self.transform.getNrOfJoints())
+        self.kdl_output    = kdl.JntArray(self.transform.getNrOfJoints())
+        self.num_joints    = self.transform.getNrOfJoints()
         if self.num_joints != len(self.base_joints):
             printError("Extracted chain has " + str(self.num_joints) + " joints, but " + len(self.base_joints) + " were expected.")
+        self.test          = test
+
+        if self.test:
+            kdl_frame = self.getTcpFromAngles(self.base_joints)
+            print("=" * 50, "End of Robot constructor")
     
     def getJointAnglesFromCurrent(self, loc, rot, current):
         self._reset(current)
@@ -86,11 +92,31 @@ class Robot(object):
         self._reset()
         return self._getJointAngles(loc, rot)
     
-    def getTcpFromAngles(self, angles):
+    def getTcpFromAngles(self, angles, frame=None):
+        angles = np.asarray(angles)
+        if self.test:
+            print("TCP-FA Input", angles, type(angles))
         self._reset(angles)
-        goal = kdl.Frame()
-        self.kdl_fk.JntToCart(self.kdl_input, goal)
-        return goal
+        if frame is None:
+            frame = kdl.Frame()
+        if self.test:
+            print("TCP-FA KDL-Input", self.kdl_input)
+            print("FK Solver", self.kdl_fk)
+        res = self.kdl_fk.JntToCart(self.kdl_input, frame)
+        if res == -4:
+            print("Error: Forward Kinematics Solver failed due to E_SIZE_MISMATCH with code", res)
+            print("   Initialized Chain Size:", self.num_joints)
+            print("   Input Size:", self.kdl_input.rows())
+            exit(0)
+        elif res == -1:
+            print("Error: Forward Kinematics Solver failed due to E_NO_CONVERGE with code", res)
+        elif res == -5:
+            print("Error: Forward Kinematics Solver failed due to E_MAX_ITERATIONS_EXCEEDED with code", res)
+        elif res < 0:
+            print("Error: Forward Kinematics Solver failed with error code", res)
+        if self.test:
+            print("TCP-FA Output", [frame.p.x(), frame.p.y(), frame.p.z()])
+        return frame
 
     def _reset(self, target=None):
         if target is None:

@@ -29,20 +29,32 @@ When using this code and/or model, we would apprechiate the following citation:
 
 ## Environment Setup
 ### Local Setup
-Our code is tested on __Ubuntu 18.04__ with __Python 3.6__. At this time, running our code on MacOS or Windows is not supported. To install Python requirements:
+Our code is tested on __Ubuntu 20.04__ with __Python 3.8__. At this time, running our code on MacOS or Windows is not supported, but may work. In order to set up our code create a new conda environment as follows:
+
+To install Python requirements:
 ```setup
-pip install -r requirements.txt
+conda env create -f environment.yml 
 ```
-Further requirements for _Evaluation_:
-- [CoppeliaSim](https://www.coppeliarobotics.com/downloads): Downloading and installing the player version will be sufficient, as long as you do not want to change the simulation environment itself. Our code was tested with version 4.0 and 4.1
-- [ROS 2 Eloquent](https://index.ros.org/doc/ros2/Installation/Eloquent/): ROS is used for communication between the simulator and the neural network. Before running our code, please make sure to compile and source the workspace _ros2_ in this repository in order for our code to find the required packages
-- [PyRep](https://github.com/stepjam/PyRep): Please follow the installation instructions at the respective repository.
+This will set up a basic environment named "lp". However, further modules are needed and need to be manually installed:
+- [CoppeliaSim](https://www.coppeliarobotics.com/downloads): Downloading and installing the player version will be sufficient, as long as you do not want to change the simulation environment itself. Our code was tested with version 4.1
+
+After downloading and extracting CoppeliaSim, you will need the following environment variables set (please replace the path accordingly)
+```
+export COPPELIASIM_ROOT=/<path>/<to>/CoppeliaSim_Edu_V4_1_0_Ubuntu20_04
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$COPPELIASIM_ROOT
+export QT_QPA_PLATFORM_PLUGIN_PATH=$COPPELIASIM_ROOT
+```
+
+Then, install the remaining dependancies:
+- [ROS 2 Foxy](https://docs.ros.org/en/foxy/Installation.html): ROS is used for communication between the simulator and the neural network. Before running our code, please make sure to compile and source the workspace _ros2_ in this repository in order for our code to find the required packages.
+- [PyRep](https://github.com/stepjam/PyRep): Please clone their repository and check out commit _96c0b034ee21ab5e6ba0942c4d57993a8670379a_. Then, the package can be installed with:
+```
+pip install .
+```
+- [Orocos KDL](https://github.com/orocos/orocos_kinematics_dynamics): The python-wrapper has to match the solver version installed on your system. We strongly suggest to install both components from the git repository. Our code was tested with commit _86c7893234aeccec3b9bf24cf20de9380d64bdf3_. Please follow their installation instructions for _orocos_kdl_ and _python_orocos_kdl_. However, after running _make_ in the python package, you should have created a file called _PyKDL.so_. Copy this file to your python interpreter's _site-packages_. You can check if KDL is ready to be used by running the code in _utils/test_KDL.py_.
 
 
-Further requirements for _Data Collection_:
-- [Orocos KDL](https://github.com/orocos/orocos_kinematics_dynamics): The python-wrapper has to match the solver version installed on your system. We strongly suggest to install both components from the git repository. For Python3, the following [GitHub-Issue](https://github.com/orocos/orocos_kinematics_dynamics/issues/115#issuecomment-363828002) provides guidance for the installation process.
-
-To run the model, you need to download the __dataset__, __pre-trained model__, and other required files. The required files can be downloaded from [here](https://drive.google.com/uc?id=1hxHmeBEWxhaiIFYW4BKpatz_AFnmqNxt). The downloaded file contains a pre-trained model, the processed training dataset (and other supporting files), and the test-data used for evaluation.
+To run the model and simulation, you need to download the __dataset__, __pre-trained model__, and other required files. The required files can be downloaded from [here](https://drive.google.com/file/d/1fE_Tv44Vl40_KNeu9oI-3VllRJVXyNVZ/view?usp=share_link). The downloaded file contains a pre-trained model, the processed training dataset (and other supporting files), and the test-data used for evaluation.
 The downloaded file should be placed next to the root folder of this repository. The folder _LanguagePolicies_ and the extracted _GDrive_ should reside in the same directory. 
 
 ### Docker
