@@ -1,4 +1,4 @@
-name: lp2
+name: lp
 channels:
   - conda-forge
   - defaults

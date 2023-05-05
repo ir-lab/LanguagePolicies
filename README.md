@@ -44,6 +44,10 @@ To install Python requirements (this is for Ubuntu 22.04 and Python 3.10):
 conda env create -f environment.yml 
 ```
 This will set up a basic environment named "lp". The reason for the python version is that if you compile KDL from scratch, it uses the system python, which is 3.10 for Ubuntu 22.04. While not provided, you should be able to run this code on other Linux versions. If you are not using the setup described above, you may need to re-compile the protobuf files, which can be done via the _compile.sh_ script in _utils/proto_.
+For the additional setup, please active that environment
+```
+conda activate lp
+```
 
 Further modules are needed and need to be manually installed:
 - [CoppeliaSim](https://www.coppeliarobotics.com/downloads): Downloading and installing the player version will be sufficient, as long as you do not want to change the simulation environment itself. Our code was tested with version 4.1 (On Ubuntu 22.04, download the 20.04 version which seems to be working).
@@ -125,7 +129,6 @@ The following additions were made:
       - Updated to Python 3.10
       - Updated to Ubuntu 22.04
       - Updated scene file to work with newer versions of CoppeliaSim
-      - Removed ROS dependancy
   - Added a link to the full dataset used for training
   - Removed the Docker version of this repo as it is very outdated
   - Removed the dependency on ROS and replaced it with gRPC as it is much more lightweight
