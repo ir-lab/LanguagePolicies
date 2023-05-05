@@ -5,8 +5,13 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
 import sys
-import rclpy
-from policy_translation.srv import NetworkPT, TuneNetwork
+from concurrent import futures
+# import rclpy
+# from policy_translation.srv import NetworkPT, TuneNetwork
+import sys,os
+sys.path.append(os.path.join(os.path.dirname(__file__), "utils", "proto"))
+from utils.proto import lp_pb2, lp_pb2_grpc
+
 from model_src.model import PolicyTranslationModel
 from utils.network import Network
 from utils.tf_util import trainOnCPU, limitGPUMemory
@@ -14,7 +19,7 @@ from utils.intprim.gaussian_model import GaussianModel
 import tensorflow as tf
 import numpy as np
 import re
-from cv_bridge import CvBridge, CvBridgeError
+# from cv_bridge import CvBridge, CvBridgeError
 import cv2
 import matplotlib.pyplot as plt
 from utils.intprim.gaussian_model import GaussianModel
@@ -22,6 +27,7 @@ import glob
 import json
 import pickle
 import copy
+import grpc 
 
 # Force TensorFlow to use the CPU
 FORCE_CPU    = True
@@ -57,24 +63,45 @@ model((
 model.load_weights(MODEL_PATH)
 model.summary()
 
-class NetworkService():
-    def __init__(self):
+class NetworkService(lp_pb2_grpc.LPPolicyServicer):
+    def __init__(self, address):
+        self._address      = address
         self.dictionary    = self._loadDictionary(GLOVE_PATH)
         self.regex         = re.compile('[^a-z ]')
-        self.bridge        = CvBridge()
         self.history       = []
-        rclpy.init(args=None)
-        self.node = rclpy.create_node("neural_network")
-        self.service_nn = self.node.create_service(NetworkPT,   "/network",      self.cbk_network_dmp_ros2)
+        self._cert_path    = None
+
         self.normalization = pickle.load(open(NORM_PATH, mode="rb"), encoding="latin1")
         print("Ready")
 
-    def runNode(self):
-        while rclpy.ok():
-            rclpy.spin_once(self.node)
-        self.node.destroy_service(self.service_nn)
-        self.node.destroy_service(self.service_tn)
-        rclpy.shutdown()
+    def create_grpc_server(self):
+        grpc_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+
+        if self._cert_path is None:
+            grpc_server.add_insecure_port(self._address)
+            print("gRPC: Created an insecure channel")
+        else:
+            key_file = os.path.join(self._cert_path, "server.key")
+            with open(key_file, "rb") as f:
+                private_key = f.read()
+
+            certificate_file = os.path.join(self._cert_path, "server.crt")
+            with open(certificate_file, "rb") as f:
+                certificate_chain = f.read()
+
+            ca_file = os.path.join(self._cert_path, "server.crt")
+            ca_cert = None
+            with open(ca_file, "rb") as f:
+                ca_cert = f.read()
+
+            server_credentials = grpc.ssl_server_credentials(
+                [(private_key, certificate_chain)],
+                root_certificates=ca_cert,
+                require_client_auth=False
+            )
+            grpc_server.add_secure_port(self._address, server_credentials)
+            logging.info("Created a secure channel.")
+        return grpc_server
 
     def _loadDictionary(self, file):
         __dictionary = {}
@@ -119,10 +146,6 @@ class NetworkService():
             result[:,i] = np.interp(np.linspace(0.0, 1.0, num=target), np.linspace(0.0, 1.0, num=current_length), trj[:,i])
         
         return result
-
-    def cbk_network_dmp_ros2(self, req, res):
-        res.trajectory, res.confidence, res.timesteps, res.weights, res.phase = self.cbk_network_dmp(req)
-        return res
     
     def imgmsg_to_cv2(self, img_msg, desired_encoding="passthrough"):   
         if img_msg.encoding != "8UC3":     
@@ -157,15 +180,14 @@ class NetworkService():
 
         return res
 
-    def cbk_network_dmp(self, req):
-        if req.reset:
+    def Predict(self, request, context):
+        if request.reset:
             self.req_step = 0
             self.sfp_history = []
-            try:
-                image = self.imgmsg_to_cv2(req.image)
-            except CvBridgeError as e:
-                print(e)
-            language = self.tokenize(req.language)
+            image = np.frombuffer(request.image.data, dtype=np.uint8)
+            image = image.reshape((request.image.height, request.image.width, 3))
+            print(image.shape)
+            language = self.tokenize(request.language)
             self.language = language + [0] * (15-len(language))
 
             image_features = model.frcnn(tf.convert_to_tensor([image], dtype=tf.uint8))
@@ -182,7 +204,7 @@ class NetworkService():
 
             self.history  = []        
 
-        self.history.append(list(req.robot)) 
+        self.history.append(list(request.robot)) 
 
         robot           = np.asarray(self.history, dtype=np.float32)
         self.input_data = (
@@ -222,7 +244,16 @@ class NetworkService():
             self.sfp_history = []
         
         self.req_step += 1
-        return (self.trj_gen.flatten().tolist(), self.trj_std.flatten().tolist(), self.timesteps, self.b_weights.flatten().tolist(), float(phase_value)) 
+
+        action = lp_pb2.Action(
+            trajectory=self.trj_gen.flatten().tolist(),
+            confidence=self.trj_std.flatten().tolist(),
+            timesteps=self.timesteps,
+            weights=self.b_weights.flatten().tolist(),
+            phase=float(phase_value),
+        )
+        return action
+        # return (self.trj_gen.flatten().tolist(), self.trj_std.flatten().tolist(), self.timesteps, self.b_weights.flatten().tolist(), float(phase_value)) 
     
     def idToText(self, id):
         names = ["", "Yellow Small Round", "Red Small Round", "Green Small Round", "Blue Small Round", "Pink Small Round",
@@ -264,5 +295,9 @@ class NetworkService():
         plt.imshow(image_np)
     
 if __name__ == "__main__":
-    ot = NetworkService()
-    ot.runNode()
+    server = NetworkService(address="[::]:55237")
+    servicer = server.create_grpc_server()
+    lp_pb2_grpc.add_LPPolicyServicer_to_server(server, servicer)
+    servicer.start()
+    print("Language Policy Ready!")
+    servicer.wait_for_termination()

@@ -2,8 +2,13 @@
 
 import matplotlib
 matplotlib.use("TkAgg")
-import rclpy
-from policy_translation.srv import NetworkPT
+# import rclpy
+# from policy_translation.srv import NetworkPT
+import sys,os
+sys.path.append(os.path.join(os.path.dirname(__file__), "utils", "proto"))
+from utils.proto import lp_pb2, lp_pb2_grpc
+import grpc
+
 from pyrep import PyRep
 from pyrep.objects.vision_sensor import VisionSensor
 from utils.voice import Voice
@@ -11,7 +16,7 @@ import sys
 import select
 import numpy as np
 import cv2
-import sensor_msgs.msg
+# import sensor_msgs.msg
 import math
 import pickle
 import glob
@@ -41,14 +46,17 @@ VREP_SCENE          = os.getcwd() + "/" + VREP_SCENE
 
 class Simulator(object):
     def __init__(self, args=None):
-        rclpy.init(args=args)
-        self.node       = rclpy.create_node("VRepSimTest")
-        self.srv_prx_nn = self.node.create_client(NetworkPT, "/network")
+        # rclpy.init(args=args)
+        # self.node       = rclpy.create_node("VRepSimTest")
+        # self.srv_prx_nn = self.node.create_client(NetworkPT, "/network")
 
-        self.node.get_logger().info("Service not available, waiting...")
-        while not self.srv_prx_nn.wait_for_service(timeout_sec=1.0):
-            pass
-        self.node.get_logger().info("... service found!")
+        channel = grpc.insecure_channel('localhost:55237')
+        self.srv_prx_nn = lp_pb2_grpc.LPPolicyStub(channel)
+
+        # print("Service not available, waiting...")
+        # while not self.srv_prx_nn.wait_for_service(timeout_sec=1.0):
+        #     pass
+        # print("... service found!")
 
         self.pyrep = PyRep()
         self.pyrep.launch(VREP_SCENE, headless=HEADLESS)
@@ -213,20 +221,37 @@ class Simulator(object):
         robot_state    = state
         robot_state[6] = self.last_gripper
 
-        req          = NetworkPT.Request()
-        req.image    = self.cv2_to_imgmsg(image[:,:,::-1])
-        req.language = self._generalizeVoice(voice)
-        req.robot    = self.normalize([robot_state], norm[0,:], norm[1,:]).flatten().tolist()
-        req.reset    = cnt == 1
-        req.plot     = False
+        # req          = NetworkPT.Request()
+        # req.image    = self.cv2_to_imgmsg(image[:,:,::-1])
+        # req.language = self._generalizeVoice(voice)
+        # req.robot    = self.normalize([robot_state], norm[0,:], norm[1,:]).flatten().tolist()
+        # req.reset    = cnt == 1
+        # req.plot     = False
 
-        future       = self.srv_prx_nn.call_async(req)
-        rclpy.spin_until_future_complete(self.node, future)
-        try:
-            result = future.result()
-        except Exception as e:
-            self.node.get_logger().info('Service call failed %r' % (e,))
-            return False
+        image = image[:,:,::-1]
+
+        img_msg = lp_pb2.Image(
+            height = image.shape[0],
+            width = image.shape[1],
+            data = image.tobytes(),
+        )
+
+        req = lp_pb2.State(
+            image = img_msg,
+            language = self._generalizeVoice(voice),
+            robot = self.normalize([robot_state], norm[0,:], norm[1,:]).flatten().tolist(),
+            reset = cnt == 1,
+            plot = False,
+        )
+
+        result       = self.srv_prx_nn.Predict(req)
+
+        # rclpy.spin_until_future_complete(self.node, future)
+        # try:
+        #     result = future.result()
+        # except Exception as e:
+        #     print('Service call failed %r' % (e,))
+        #     return False
         
         trajectory = np.asarray(result.trajectory).reshape(-1, 7)
         trajectory = self.restoreValues(trajectory, norm[0,:], norm[1,:])
@@ -491,10 +516,10 @@ class Simulator(object):
 
     def evalDirect(self, runs):
         files = glob.glob("../GDrive/testdata/*_1.json")
-        self.node.get_logger().info("Using data directory with {} files".format(len(files)))
+        print("Using data directory with {} files".format(len(files)))
         files = files[:runs]
         files = [f[:-6] for f in files]
-        self.node.get_logger().info("Running validation on {} files".format(len(files)))
+        print("Running validation on {} files".format(len(files)))
 
         data = {}
         s_p1, e_data        = self.valPhase1(files)
@@ -502,8 +527,8 @@ class Simulator(object):
         s_p2, e_data        = self.valPhase2(files)
         data["phase_2"]     = e_data
 
-        self.node.get_logger().info("Testing Picking: {}/{} ({:.1f}%)".format(s_p1,  runs, 100.0 * float(s_p1)/float(runs)))
-        self.node.get_logger().info("Testing Pouring: {}/{} ({:.1f}%)".format(s_p2,  runs, 100.0 * float(s_p2)/float(runs)))
+        print("Testing Picking: {}/{} ({:.1f}%)".format(s_p1,  runs, 100.0 * float(s_p1)/float(runs)))
+        print("Testing Pouring: {}/{} ({:.1f}%)".format(s_p2,  runs, 100.0 * float(s_p2)/float(runs)))
 
         p1_names = data["phase_1"].keys()
         p2_names = data["phase_2"].keys()
@@ -513,7 +538,7 @@ class Simulator(object):
             if data["phase_1"][n]["success"] and data["phase_2"][n]["success"]:
                 c_p2  += 1
 
-        self.node.get_logger().info("Whole Task: {}/{} ({:.1f}%)".format(c_p2,  len(names), 100.0 * float(c_p2)  / float(len(names))))
+        print("Whole Task: {}/{} ({:.1f}%)".format(c_p2,  len(names), 100.0 * float(c_p2)  / float(len(names))))
 
         with open("val_result.json", "w") as fh:
             json.dump(data, fh)
@@ -560,7 +585,7 @@ class Simulator(object):
                 floats += [0.0]
 
         self._createEnvironment(ints, floats)
-        self.node.get_logger().info("Created new environment")
+        print("Created new environment")
         return ints, floats
 
     def simplifyVoice(self, voice):
@@ -580,7 +605,7 @@ class Simulator(object):
         if d_in == "r":
             self.rm_voice     = ""
             self.last_gripper = 0.0
-            self.node.get_logger().info("Resetting robot")
+            print("Resetting robot")
             self._resetEnvironment()
         elif d_in.startswith("t "):
             self.rm_voice = d_in[2:]
@@ -595,7 +620,7 @@ class Simulator(object):
             self._maybeDropBall(r_state)
 
             if phase >=0.95:
-                self.node.get_logger().info("Finished running trajectory with " + str(self.cnt) + " steps")
+                print("Finished running trajectory with " + str(self.cnt) + " steps")
                 self._stopRobotMovement()
                 self.rm_voice = ""
 

@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package cmu.lp;
+
+message Image {
+    int32 width = 1;
+    int32 height = 2;
+    bytes data = 3;
+}
+
+message Action {
+    repeated float trajectory = 1;
+    repeated float confidence = 2;
+    int32 timesteps = 3;
+    repeated float weights = 4;
+    float phase = 5;
+}
+
+message State {
+    Image image = 1;
+    string language = 2;
+    repeated float robot = 3;
+    bool reset = 4;
+    bool plot = 5;
+}
+
+service LPPolicy {
+    rpc Predict(State) returns (Action) {}
+}

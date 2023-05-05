@@ -7,7 +7,6 @@ import sys
 import numpy as np
 from utils.graphs import TBoardGraphs
 import shutil
-import pycurl
 import pickle
 import os
 
