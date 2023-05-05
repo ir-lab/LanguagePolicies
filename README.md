@@ -5,15 +5,18 @@ This repository is the official implementation of [Language-Conditioned Imitatio
 
 When using this code and/or model, we would apprechiate the following citation:
 ```
-@misc{stepputtis2020languageconditioned,
-      title={Language-Conditioned Imitation Learning for Robot Manipulation Tasks}, 
-      booktitle = {Advances in Neural Information Processing Systems},
-      author={Simon Stepputtis and Joseph Campbell and Mariano Phielipp and Stefan Lee and Chitta Baral and Heni Ben Amor},
-      year={2020},
-      eprint={2010.12083},
-      archivePrefix={arXiv},
-      primaryClass={cs.RO},
+@inproceedings{NEURIPS2020_9909794d,
+ author = {Stepputtis, Simon and Campbell, Joseph and Phielipp, Mariano and Lee, Stefan and Baral, Chitta and Ben Amor, Heni},
+ booktitle = {Advances in Neural Information Processing Systems},
+ editor = {H. Larochelle and M. Ranzato and R. Hadsell and M.F. Balcan and H. Lin},
+ pages = {13139--13150},
+ publisher = {Curran Associates, Inc.},
+ title = {Language-Conditioned Imitation Learning for Robot Manipulation Tasks},
+ url = {https://proceedings.neurips.cc/paper_files/paper/2020/file/9909794d52985cbc5d95c26e31125d1a-Paper.pdf},
+ volume = {33},
+ year = {2020}
 }
+
 ```
 
 ## Inddex
@@ -26,6 +29,7 @@ When using this code and/or model, we would apprechiate the following citation:
 3. [Results](#results)
       - [Additional Results](doc/detailed_results.md)
       - [Various Demonstrations](doc/demonstrations.md)
+4. [Changelog](#changelog)
 
 ## Environment Setup
 ### Local Setup
@@ -39,8 +43,10 @@ To install Python requirements (this is for Ubuntu 22.04 and Python 3.10):
 ```setup
 conda env create -f environment.yml 
 ```
-This will set up a basic environment named "lp". However, further modules are needed and need to be manually installed:
-- [CoppeliaSim](https://www.coppeliarobotics.com/downloads): Downloading and installing the player version will be sufficient, as long as you do not want to change the simulation environment itself. Our code was tested with version 4.1 (On Ubuntu 22.04, download the 20.04 version).
+This will set up a basic environment named "lp". The reason for the python version is that if you compile KDL from scratch, it uses the system python, which is 3.10 for Ubuntu 22.04. While not provided, you should be able to run this code on other Linux versions. If you are not using the setup described above, you may need to re-compile the protobuf files, which can be done via the _compile.sh_ script in _utils/proto_.
+
+Further modules are needed and need to be manually installed:
+- [CoppeliaSim](https://www.coppeliarobotics.com/downloads): Downloading and installing the player version will be sufficient, as long as you do not want to change the simulation environment itself. Our code was tested with version 4.1 (On Ubuntu 22.04, download the 20.04 version which seems to be working).
 
 After downloading and extracting CoppeliaSim, you will need the following environment variables set (please replace the path accordingly)
 ```
@@ -50,32 +56,14 @@ export QT_QPA_PLATFORM_PLUGIN_PATH=$COPPELIASIM_ROOT
 ```
 
 Then, install the remaining dependancies:
-- [PyRep](https://github.com/stepjam/PyRep): Please clone their repository and check out commit _96c0b034ee21ab5e6ba0942c4d57993a8670379a_. Then, the package can be installed with:
-```
-pip install .
-```
-- [Orocos KDL](https://github.com/orocos/orocos_kinematics_dynamics): The python-wrapper has to match the solver version installed on your system. We strongly suggest to install both components from the git repository. Our code was tested with commit _86c7893234aeccec3b9bf24cf20de9380d64bdf3_. Please follow their installation instructions for _orocos_kdl_ and _python_orocos_kdl_. However, to set the Python versions o
+- [PyRep](https://github.com/stepjam/PyRep): Please clone their repository and check out commit _96c0b034ee21ab5e6ba0942c4d57993a8670379a_. Then, the package can be installed with: _pip install ._ (note the "." at the end). You can test if PyRep is set up correctly with a small script found in _utils/test_pyrep.py_
 
-cmake .. -DPYTHON_INCLUDE_DIR=$(python -c "import sysconfig; print(sysconfig.get_path('include'))") -DPYTHON_LIBRARY=$(python -c "import sysconfig; print(sysconfig.get_config_var('LIBDIR'))")
-
- after running _make_ in the python package, you should have created a file called _PyKDL.so_. Copy this file to your python interpreter's _site-packages_. You can check if KDL is ready to be used by running the code in _utils/test_KDL.py_.
+- [Orocos KDL](https://github.com/orocos/orocos_kinematics_dynamics): The python-wrapper has to match the solver version installed on your system. We strongly suggest to install both components from the git repository. Our code was tested with commit _86c7893234aeccec3b9bf24cf20de9380d64bdf3_. Please follow their installation instructions for _orocos_kdl_ and _python_orocos_kdl_. However, after running _make_ in the python package, you should have created a file called _PyKDL.so_. Copy this file to your python interpreter's _site-packages_. You can check if KDL is ready to be used by running the code in _utils/test_KDL.py_.
 
 
 To run the model and simulation, you need to download the __dataset__, __pre-trained model__, and other required files. The required files can be downloaded from [here](https://drive.google.com/file/d/1fE_Tv44Vl40_KNeu9oI-3VllRJVXyNVZ/view?usp=share_link). The downloaded file contains a pre-trained model, the processed training dataset (and other supporting files), and the test-data used for evaluation.
 The downloaded file should be placed next to the root folder of this repository. The folder _LanguagePolicies_ and the extracted _GDrive_ should reside in the same directory. 
-
-### Docker
-If you rather look at this code in a Docker container, we provided a Dockerfile with this repository. To build the container, run the following 
-```
-docker build -t languagepolicies .
-```
-After the container is successfully built, start it with the following command (please note that the container takes some time to start up fully) 
-```
-docker run -p 6081:80 -e RESOLUTION=1280x720 --rm languagepolicies
-```
-After seeing some terminal output, direct your browser to [localhost:6081](http://localhost:6081). This repository is fully set up in _~/Code_, and you can follow the instructions below to train and/or evaluate the model. In the container, you can find a terminal in the start menu under _System Tools -> LXTerminal_.
-
-Please note that data collection and processing is not supported in the docker container.
+Additionally we provide our full raw data as an optinoal download [here](https://drive.google.com/file/d/1ssZUdL3PIrppug5kRhwQhP-InCA1y9nY/view?usp=share_link) (Note: 6GB download and ~100GB extracted)
 
 ## Quick Start
 A detailed description of the training and evaluation process can be found on our [Details: Training and Evaluation](doc/evaluation.md) page. If you are interested in collecting data, please refer to our [Details: Data Collection](doc/data_collection.md) page.
@@ -126,3 +114,20 @@ More examples can be found in the [Additional Examples](doc/demonstrations.md)
 If you would like to contribute or have any suggestions, feel free to open an issue on this GitHub repository or contact the first author of this work!
 
 All contributions welcome! All content in this repository is licensed under the MIT license.
+
+## Changelog
+
+The following additions were made:
+- __May 2023__
+  - Updated the code to work with recent versions of various depending libraries
+      - Updated KDL version
+      - Updated PyRep version
+      - Updated to Python 3.10
+      - Updated to Ubuntu 22.04
+      - Updated scene file to work with newer versions of CoppeliaSim
+      - Removed ROS dependancy
+  - Added a link to the full dataset used for training
+  - Removed the Docker version of this repo as it is very outdated
+  - Removed the dependency on ROS and replaced it with gRPC as it is much more lightweight
+- __November 2020__
+  - Initial releas

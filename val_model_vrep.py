@@ -46,17 +46,8 @@ VREP_SCENE          = os.getcwd() + "/" + VREP_SCENE
 
 class Simulator(object):
     def __init__(self, args=None):
-        # rclpy.init(args=args)
-        # self.node       = rclpy.create_node("VRepSimTest")
-        # self.srv_prx_nn = self.node.create_client(NetworkPT, "/network")
-
         channel = grpc.insecure_channel('localhost:55237')
         self.srv_prx_nn = lp_pb2_grpc.LPPolicyStub(channel)
-
-        # print("Service not available, waiting...")
-        # while not self.srv_prx_nn.wait_for_service(timeout_sec=1.0):
-        #     pass
-        # print("... service found!")
 
         self.pyrep = PyRep()
         self.pyrep.launch(VREP_SCENE, headless=HEADLESS)
@@ -221,13 +212,6 @@ class Simulator(object):
         robot_state    = state
         robot_state[6] = self.last_gripper
 
-        # req          = NetworkPT.Request()
-        # req.image    = self.cv2_to_imgmsg(image[:,:,::-1])
-        # req.language = self._generalizeVoice(voice)
-        # req.robot    = self.normalize([robot_state], norm[0,:], norm[1,:]).flatten().tolist()
-        # req.reset    = cnt == 1
-        # req.plot     = False
-
         image = image[:,:,::-1]
 
         img_msg = lp_pb2.Image(
@@ -245,13 +229,6 @@ class Simulator(object):
         )
 
         result       = self.srv_prx_nn.Predict(req)
-
-        # rclpy.spin_until_future_complete(self.node, future)
-        # try:
-        #     result = future.result()
-        # except Exception as e:
-        #     print('Service call failed %r' % (e,))
-        #     return False
         
         trajectory = np.asarray(result.trajectory).reshape(-1, 7)
         trajectory = self.restoreValues(trajectory, norm[0,:], norm[1,:])
