@@ -77,7 +77,23 @@ To train the model with default parameters, run the following command in this re
 ```training
 python main.py
 ```
-The trained model will be located in _Data/Model_, and TensorBoard logs will be in _Data/TBoardLog_. Overall, training will take around 35 hours, depending on your hardware. A GPU is not required, and our model has been trained on a node with two _Intel Xeon CPU E5-2699A v4 @ 2.40GHz_. Please note that the usage of a GPU is not beneficial to our model due to the use of a custom RNN loop.
+The trained model will be located in _Data/Model_, and TensorBoard logs will be in _Data/TBoardLog_. Overall, training will take around 35 hours, depending on your hardware. A GPU is not required, and our model has been trained on a node with two _Intel Xeon CPU E5-2699A v4 @ 2.40GHz_. Please note that the usage of a GPU is not necisarrily beneficial due to the intricacies of our model. However, nothing prevents the usage of GPUs and the performance will depend on your specific hardware. 
+
+Training parameters can be found in lines 25-37 of the main.py file and are customizable according to your preferences. The parameters currently set in the file were utilized during the training of our model, which resulted in the reported findings in the paper. It is important to note that a few random initializations, or training runs, may fail to converge. While this occurrence is uncommon, it can be detected early on in the training process if the attention loss does not converge at all. If this happens, restart the training using a different seed. Since the seeds are random, simply restarting the training process should suffice.
+
+__Observin the Training Process__
+
+You can observe the training progress via TensorBoard. You should be able to start it with the following command:
+```
+tensorboard --logdir ./Data/TBoardLog
+```
+In TensorBoard, you can observe various training metrics, including the losses for all auxiliary tasks. Specifically, the training progress of the Attention module can be visualized through the provided bar plot, which offers an intuitive representation. The green bar represents the ground-truth target, while the blue bars indicate the likelihood of the predicted target object. This visualization should begin displaying the correct tendency after approximately 15 epochs of training.
+
+Another noteworthy metric is the Trajectory plot, illustrating the trajectory across the robot's seven degrees of freedom (DoF) (six DoF for the robot and one for the gripper). The ground-truth motions are depicted by green lines, while the blue lines represent the robot's motions when utilizing the policy.
+
+The final plot presents the predicted phase, indicating the progression of the task. The green-dashed line marks the point at which the ground-truth trajectory completed the task (the remaining trajectory is a result of padding), whereas the blue-dashed line represents the policy's prediction of task completion.
+
+By default, the training is configured for 200 epochs. However, it is worth noting that usable policies are typically attained around the 150-epoch mark.
 
 
 ### Evaluation
@@ -132,5 +148,6 @@ The following additions were made:
   - Added a link to the full dataset used for training
   - Removed the Docker version of this repo as it is very outdated
   - Removed the dependency on ROS and replaced it with gRPC as it is much more lightweight
+  - Provided further details for training the model
 - __November 2020__
   - Initial releas
