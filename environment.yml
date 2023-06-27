@@ -71,7 +71,6 @@ dependencies:
       - pyasn1-modules==0.3.0
       - pycparser==2.21
       - pyparsing==3.0.9
-      - pyrep==4.1.0.3
       - python-dateutil==2.8.2
       - pyyaml==6.0
       - requests==2.30.0
